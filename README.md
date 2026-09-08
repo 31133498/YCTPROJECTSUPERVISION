@@ -69,10 +69,20 @@ the caller is verified.
 | `SUPABASE_SERVICE_ROLE_KEY` | **server-only, secret** | bypasses RLS; used only to sign download URLs / delete objects |
 
 Setup: Supabase dashboard → **Storage → New bucket** → name `submissions`,
-**Private**. Add RLS policies on `storage.objects` so a user can only touch
-paths under a project they belong to (path prefix
-`projects/<projectId>/submissions/...`). Client upload helper:
-`lib/storage/submissions.ts`; server signing: `lib/supabase-admin.ts`.
+**Private**. **No custom RLS policies are needed** — auth is Firebase, so the
+browser has no Supabase identity (`auth.uid()` is always null). Instead every
+transfer goes through a one-time, server-minted signed URL:
+
+- upload: `POST /api/submissions/sign-upload` verifies the Firebase session +
+  that the caller is the project's student, returns a signed upload URL, and the
+  browser PUTs the file straight to Supabase (bytes skip the Vercel function).
+- download: `POST /api/submissions/sign-download` verifies read access and
+  returns a ~5-minute signed URL.
+
+Keep the bucket Private with RLS **enabled and zero policies** (deny-all for
+direct `anon`/`authenticated` access); the service-role key used by
+`lib/supabase-admin.ts` bypasses RLS to sign. Client helper:
+`lib/storage/submissions.ts`.
 
 ---
 

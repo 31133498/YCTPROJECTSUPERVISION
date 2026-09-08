@@ -30,6 +30,25 @@ function getSupabaseAdmin(): SupabaseClient {
   return cached;
 }
 
+/**
+ * One-time signed UPLOAD URL for a submission object. The browser PUTs the file
+ * straight to Supabase with this — bytes never pass through the Vercel function
+ * (which caps request bodies at ~4.5 MB), and no broad Storage policy is needed
+ * because the token authorises the write. Mint it only after verifying the
+ * caller owns the project.
+ */
+export async function createSubmissionUploadUrl(
+  storagePath: string
+): Promise<{ signedUrl: string; token: string; path: string }> {
+  const { data, error } = await getSupabaseAdmin()
+    .storage.from(SUBMISSIONS_BUCKET)
+    .createSignedUploadUrl(storagePath, { upsert: true });
+  if (error || !data) {
+    throw new Error(`Failed to sign upload for ${storagePath}: ${error?.message}`);
+  }
+  return data;
+}
+
 /** Signed download URL for a submission object. Default TTL: 5 minutes. */
 export async function createSubmissionSignedUrl(
   storagePath: string,
