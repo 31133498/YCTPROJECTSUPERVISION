@@ -4,6 +4,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { getSessionUser } from "@/lib/auth/session";
 import { bumpStats } from "@/lib/server/stats";
+import { queueNotification } from "@/lib/server/notify";
 
 export const runtime = "nodejs";
 
@@ -99,6 +100,13 @@ export async function POST(req: NextRequest) {
     { "byMilestoneStatus.on_track": FieldValue.increment(1) },
     { merge: true }
   );
+
+  queueNotification(batch, db, studentId, {
+    kind: "project",
+    title: `${user.name ?? "Your supervisor"} created your project "${title.trim()}"`,
+    href: `/student/project/${projectRef.id}`,
+    actorName: user.name ?? "",
+  });
 
   await batch.commit();
   return NextResponse.json({ status: "ok", projectId: projectRef.id });

@@ -17,7 +17,7 @@ const ICONS: Record<ActivityEvent["kind"], LucideIcon> = {
   status_change: GitCommitHorizontal,
 };
 
-/** Cross-role activity feed. Pure presentational — feed it `ActivityEvent[]`. */
+/** Cross-role activity feed. Presentational — feed it `ActivityEvent[]`. */
 export function Timeline({
   events,
   className,
@@ -26,23 +26,23 @@ export function Timeline({
   className?: string;
 }) {
   return (
-    <ol className={cn("relative space-y-6", className)}>
+    <ol className={cn("relative", className)}>
       {events.map((event, i) => {
         const Icon = ICONS[event.kind];
         const isLast = i === events.length - 1;
         return (
-          <li key={event.id} className="relative flex gap-3">
+          <li key={event.id} className="relative flex gap-3 pb-5 last:pb-0">
             {!isLast && (
               <span
                 aria-hidden
-                className="absolute left-[13px] top-7 h-[calc(100%+0.5rem)] w-px bg-border"
+                className="absolute left-[13px] top-7 h-full w-px bg-border"
               />
             )}
             <span className="z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border bg-background text-muted-foreground">
               <Icon className="h-3.5 w-3.5" />
             </span>
-            <div className="min-w-0 flex-1 pt-0.5">
-              <p className="text-sm">
+            <div className="min-w-0 flex-1 pt-1">
+              <p className="text-sm leading-tight">
                 {event.href ? (
                   <a
                     href={event.href}
@@ -54,8 +54,8 @@ export function Timeline({
                   <span className="font-medium">{event.title}</span>
                 )}
               </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {event.actorName} &middot; {formatRelativeTime(event.at)}
+              <p className="mt-0.5 text-2xs text-muted-foreground">
+                {event.actorName} · {formatRelativeTime(event.at)}
               </p>
             </div>
           </li>

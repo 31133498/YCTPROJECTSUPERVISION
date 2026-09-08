@@ -5,6 +5,8 @@ import { getAdminDb } from "@/lib/firebase-admin";
 import { getSessionUser } from "@/lib/auth/session";
 import { bumpStats } from "@/lib/server/stats";
 import { applyMilestone, loadProjectAdmin } from "@/lib/server/project-writes";
+import { queueNotification } from "@/lib/server/notify";
+import { projectHref } from "@/lib/routes";
 import type { SubmissionKind } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -104,6 +106,14 @@ export async function POST(
   });
 
   bumpStats(batch, db, project.supervisorId, { pendingSubmissions: 1 });
+
+  queueNotification(batch, db, project.supervisorId, {
+    kind: "submission",
+    title: `${user.name ?? "Student"} submitted "${title.trim()}" (v${version})`,
+    href: projectHref("supervisor", params.projectId),
+    actorName: user.name ?? "",
+  });
+
   if (before !== verdict.status) {
     const delta = (verdict.status !== "on_track" ? 1 : 0) - (before !== "on_track" ? 1 : 0);
     bumpStats(batch, db, project.supervisorId, { overdueCount: delta }, false);

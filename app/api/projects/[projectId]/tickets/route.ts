@@ -5,6 +5,8 @@ import { getAdminDb } from "@/lib/firebase-admin";
 import { getSessionUser } from "@/lib/auth/session";
 import { bumpStats } from "@/lib/server/stats";
 import { applyMilestone, loadProjectAdmin } from "@/lib/server/project-writes";
+import { queueNotification } from "@/lib/server/notify";
+import { projectHref } from "@/lib/routes";
 import type { TicketPriority } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -83,6 +85,20 @@ export async function POST(
   });
 
   bumpStats(batch, db, project.supervisorId, { openTickets: 1 });
+
+  const recipientIsStudent = user.uid !== project.studentId;
+  queueNotification(
+    batch,
+    db,
+    recipientIsStudent ? project.studentId : project.supervisorId,
+    {
+      kind: "ticket",
+      title: `New ticket: ${body.title.trim()}`,
+      href: projectHref(recipientIsStudent ? "student" : "supervisor", params.projectId),
+      actorName: user.name ?? "",
+    }
+  );
+
   if (before !== verdict.status) {
     const wasOverdue = before !== "on_track" ? 1 : 0;
     const isOverdue = verdict.status !== "on_track" ? 1 : 0;

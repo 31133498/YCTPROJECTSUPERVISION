@@ -4,6 +4,8 @@ import { FieldValue } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { getSessionUser } from "@/lib/auth/session";
 import { applyMilestone, loadProjectAdmin } from "@/lib/server/project-writes";
+import { queueNotification } from "@/lib/server/notify";
+import { projectHref } from "@/lib/routes";
 import type { SubmissionStatus } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -84,6 +86,18 @@ export async function PATCH(
     },
     { merge: true }
   );
+
+  queueNotification(batch, db, project.studentId, {
+    kind: "review",
+    title:
+      next === "approved"
+        ? `"${sub.title}" was approved`
+        : next === "changes_requested"
+          ? `Changes requested on "${sub.title}"`
+          : `"${sub.title}" review updated`,
+    href: projectHref("student", params.projectId),
+    actorName: user.name ?? "",
+  });
 
   const before = project.milestoneStatus;
   const verdict = applyMilestone(batch, projectRef, {

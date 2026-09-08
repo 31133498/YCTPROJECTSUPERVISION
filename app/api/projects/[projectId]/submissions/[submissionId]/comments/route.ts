@@ -5,6 +5,8 @@ import { getAdminDb } from "@/lib/firebase-admin";
 import { getSessionUser } from "@/lib/auth/session";
 import { canReadProject } from "@/lib/server/project-access";
 import { loadProjectAdmin } from "@/lib/server/project-writes";
+import { queueNotification } from "@/lib/server/notify";
+import { projectHref } from "@/lib/routes";
 
 export const runtime = "nodejs";
 
@@ -77,6 +79,19 @@ export async function POST(
     db.doc(`dashboard_stats/${project.supervisorId}`),
     { lastActivityAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() },
     { merge: true }
+  );
+
+  const recipientIsStudent = user.uid !== project.studentId;
+  queueNotification(
+    batch,
+    db,
+    recipientIsStudent ? project.studentId : project.supervisorId,
+    {
+      kind: "comment",
+      title: `${user.name ?? "Someone"} commented on a submission`,
+      href: projectHref(recipientIsStudent ? "student" : "supervisor", params.projectId),
+      actorName: user.name ?? "",
+    }
   );
 
   await batch.commit();

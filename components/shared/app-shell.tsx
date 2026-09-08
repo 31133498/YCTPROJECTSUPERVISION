@@ -1,16 +1,34 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
-import { GraduationCap } from "lucide-react";
+import { Menu } from "lucide-react";
 
 import { NAV_BY_ROLE } from "@/lib/nav";
 import type { SessionUser } from "@/lib/auth/session";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
 import { SidebarNav } from "./sidebar-nav";
 import { UserMenu } from "./user-menu";
+import { NotificationBell } from "./notification-bell";
+
+function Brand() {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex h-6 w-6 items-center justify-center rounded-md bg-foreground text-background">
+        <span className="text-xs font-bold">P</span>
+      </div>
+      <span className="text-sm font-semibold tracking-tight">
+        Project Supervision
+      </span>
+    </div>
+  );
+}
 
 /**
- * Authenticated app frame: fixed sidebar (role-aware nav) + sticky topbar.
- * Server component — the interactive bits (`UserMenu`) are client islands.
- * Content is passed as `children`; dimensions are reserved so page skeletons
- * don't shift the chrome.
+ * Authenticated frame: fixed 240px sidebar (role-aware nav) + sticky top bar
+ * with the live notification bell and the account menu. Content is `children`;
+ * the shell's own dimensions are fixed so page skeletons never shift it.
  */
 export function AppShell({
   user,
@@ -20,40 +38,55 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const nav = NAV_BY_ROLE[user.role];
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <div className="grid min-h-screen grid-cols-1 md:grid-cols-[240px_1fr]">
-      <aside className="hidden border-r bg-muted/20 md:flex md:flex-col">
-        <div className="flex h-14 items-center gap-2 border-b px-4">
-          <GraduationCap className="h-5 w-5 text-primary" />
-          <span className="text-sm font-semibold leading-tight">
-            Project Supervision
-          </span>
+      <aside className="sticky top-0 hidden h-screen flex-col border-r bg-surface md:flex">
+        <div className="flex h-14 items-center px-4">
+          <Brand />
         </div>
         <SidebarNav items={nav} />
-        <p className="mt-auto p-4 text-[11px] text-muted-foreground">
-          YABATECH ND &middot; {user.department}
-        </p>
+        <div className="mt-auto px-4 py-3 text-2xs text-muted-foreground">
+          YABATECH ND · {user.department}
+        </div>
       </aside>
 
       <div className="flex min-w-0 flex-col">
-        <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-4 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:px-6">
-          <Link
-            href={nav[0]?.href ?? "/"}
-            className="text-sm font-medium md:hidden"
-          >
-            Project Supervision
+        <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b bg-background/80 px-3 backdrop-blur md:px-6">
+          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+            <SheetTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="md:hidden"
+                aria-label="Menu"
+              >
+                <Menu className="h-4 w-4" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-64 p-0">
+              <div className="flex h-14 items-center px-4">
+                <Brand />
+              </div>
+              <SidebarNav
+                items={nav}
+                onNavigate={() => setMobileOpen(false)}
+              />
+            </SheetContent>
+          </Sheet>
+
+          <Link href={nav[0]?.href ?? "/"} className="md:hidden">
+            <Brand />
           </Link>
-          <div className="ml-auto flex items-center gap-2">
-            <UserMenu
-              name={user.name}
-              email={user.email}
-              role={user.role}
-            />
+
+          <div className="ml-auto flex items-center gap-1">
+            <NotificationBell />
+            <UserMenu name={user.name} email={user.email} role={user.role} />
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-6xl flex-1 p-4 md:p-6 lg:p-8">
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 md:px-8 md:py-8">
           {children}
         </main>
       </div>

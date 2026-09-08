@@ -2,14 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { LogOut } from "lucide-react";
+import { LogOut, Monitor, Moon, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
 import { toast } from "sonner";
 
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,11 +16,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/lib/auth/auth-context";
+import { ROLE_LABELS } from "@/lib/constants";
+import type { Role } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
-function initials(name: string | null | undefined): string {
+function initials(name?: string | null) {
   if (!name) return "?";
   return name
-    .split(" ")
+    .trim()
+    .split(/\s+/)
     .map((p) => p[0])
     .slice(0, 2)
     .join("")
@@ -37,59 +38,75 @@ export function UserMenu({
 }: {
   name: string | null;
   email: string | null;
-  role: string;
+  role: Role;
 }) {
   const { user, signOutUser } = useAuth();
+  const { theme, setTheme } = useTheme();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
-  async function handleSignOut() {
+  async function signOut() {
     setBusy(true);
     try {
       await signOutUser();
-      toast.success("Signed out");
       router.replace("/login");
     } catch (err) {
-      toast.error("Couldn't sign out", {
-        description: (err as Error).message,
-      });
+      toast.error("Couldn't sign out", { description: (err as Error).message });
       setBusy(false);
     }
   }
+
+  const themes: [string, React.ElementType][] = [
+    ["light", Sun],
+    ["dark", Moon],
+    ["system", Monitor],
+  ];
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className="flex items-center gap-2 rounded-full outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex items-center gap-2 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label="Account menu"
         >
-          <Avatar className="h-8 w-8">
+          <Avatar className="h-7 w-7">
             <AvatarImage src={user?.photoURL ?? undefined} alt="" />
-            <AvatarFallback className="text-xs">
+            <AvatarFallback className="text-2xs font-medium">
               {initials(name)}
             </AvatarFallback>
           </Avatar>
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel className="flex flex-col gap-0.5">
-          <span className="truncate text-sm font-medium">
-            {name ?? "Account"}
-          </span>
-          <span className="truncate text-xs font-normal text-muted-foreground">
-            {email}
-          </span>
-          <span className="mt-1 inline-flex w-fit rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-            {role}
+      <DropdownMenuContent align="end" className="w-60">
+        <DropdownMenuLabel className="flex flex-col gap-0.5 font-normal">
+          <span className="truncate text-sm font-medium">{name ?? "Account"}</span>
+          <span className="truncate text-xs text-muted-foreground">{email}</span>
+          <span className="mt-1 w-fit rounded bg-secondary px-1.5 py-0.5 text-2xs font-medium text-muted-foreground">
+            {ROLE_LABELS[role]}
           </span>
         </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <div className="flex items-center gap-1 p-1">
+          {themes.map(([t, Icon]) => (
+            <button
+              key={t}
+              onClick={() => setTheme(t)}
+              className={cn(
+                "flex flex-1 items-center justify-center rounded-sm py-1.5 text-muted-foreground hover:bg-accent",
+                theme === t && "bg-secondary text-foreground"
+              )}
+              aria-label={t}
+            >
+              <Icon className="h-3.5 w-3.5" />
+            </button>
+          ))}
+        </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           disabled={busy}
           onSelect={(e) => {
             e.preventDefault();
-            void handleSignOut();
+            void signOut();
           }}
         >
           <LogOut className="h-4 w-4" />

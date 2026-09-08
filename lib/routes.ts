@@ -8,3 +8,12 @@ export function homePathForRole(role: Role): string {
     hod: "/hod/dashboard",
   }[role];
 }
+
+/** Where each role views a given project. */
+export function projectHref(role: Role, projectId: string): string {
+  return {
+    student: `/student/project/${projectId}`,
+    supervisor: `/supervisor/projects/${projectId}`,
+    hod: `/hod/projects/${projectId}`,
+  }[role];
+}

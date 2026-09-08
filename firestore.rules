@@ -68,6 +68,17 @@ service cloud.firestore {
         && !request.resource.data.diff(resource.data).affectedKeys()
               .hasAny(['role', 'department', 'supervisorId', 'uid']);
       allow create, delete: if false; // Admin SDK only.
+
+      // ---- users/{uid}/notifications/{id} ------------------------------
+      // Written only by API routes (Admin SDK). The owner may read the feed
+      // and flip `read` -> true; nothing else.
+      match /notifications/{notificationId} {
+        allow read: if request.auth.uid == uid;
+        allow update: if request.auth.uid == uid
+          && request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['read']);
+        allow create, delete: if false;
+      }
     }
 
     // ---- dashboard_stats/{supervisorId} ------------------------------

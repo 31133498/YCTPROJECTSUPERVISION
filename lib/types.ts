@@ -150,6 +150,23 @@ export interface ActivityPointDoc {
   tickets: number;
 }
 
+export type NotificationKind =
+  | "ticket"
+  | "submission"
+  | "comment"
+  | "review"
+  | "project";
+
+export interface NotificationDoc {
+  id: string;
+  kind: NotificationKind;
+  title: string;
+  href: string;
+  actorName: string;
+  read: boolean;
+  createdAt: Timestamp;
+}
+
 /** Shape used by the shared activity <Timeline />. */
 export interface ActivityEvent {
   id: string;

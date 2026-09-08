@@ -22,3 +22,4 @@ export * from "./submissions";
 export * from "./comments";
 export * from "./dashboard";
 export * from "./listeners";
+export * from "./notifications";
