@@ -4,7 +4,7 @@ YABATECH ND project. Supervisors run final-year projects, students submit work a
 track milestones, the HOD sees the whole department.
 
 **Stack:** Next.js 14 (App Router) · TypeScript (strict) · Tailwind + shadcn/ui ·
-lucide-react · Firebase (Auth / Firestore) · Supabase (Storage) · Cloud Functions · Vercel.
+lucide-react · recharts · Firebase (Auth / Firestore) · Supabase (Storage) · Vercel (+ Cron).
 
 ---
 
@@ -114,8 +114,9 @@ app/
   api/session             session-cookie mint / clear
 components/
   ui/                     shadcn primitives
-  shared/                 cross-role: status-badge, timeline, notification-panel,
-                          app-shell, query-state, empty/error states, skeletons
+  shared/                 cross-role: app-shell, notification-bell, status-badge,
+                          project-tabs, ticket/submission lists, comment-thread,
+                          file-upload, activity-chart, query-state, skeletons
 hooks/                    use-paginated-query, use-live-collection, use-async-data
 lib/
   firebase.ts             client SDK — Auth + Firestore (NEXT_PUBLIC_*)
@@ -124,9 +125,13 @@ lib/
   supabase-admin.ts       server — signed URLs / object delete
   storage/submissions.ts  submission upload helper
   auth/                   session (server) + auth-context (client)
-  firestore/              typed query layer — one function per query
+  firestore/              typed READ queries — one function per query
+  api.ts                  client wrappers for the /api/* mutation routes
+  milestone.ts            pure status function (cron + on-the-fly)
+  server/                 admin-side batch helpers (stats, notify, activity)
   types.ts                domain model
-functions/                Cloud Functions (own package.json)
+activity_daily/{id}                per-department daily buckets (HOD chart)
+users/{uid}/notifications/{id}     bell feed (API-route-written)
 firestore.rules  firestore.indexes.json  firebase.json
 ```
 
@@ -140,7 +145,7 @@ segment (`/student`, `/supervisor`, `/hod`) gives the URL namespace so the three
 
 ```
 users/{uid}                         role, department, (students) supervisorId, projectId
-dashboard_stats/{supervisorId}      denormalised counters (Functions-written)
+dashboard_stats/{supervisorId}      denormalised counters (API-route-written, in-batch)
 projects/{projectId}
   tickets/{ticketId}
   submissions/{submissionId}
@@ -166,8 +171,10 @@ projects/{projectId}
 - No query inside `.map()` — denormalised fields cover list rendering.
 - `onSnapshot` lives only in `lib/firestore/listeners.ts`, is attached from the
   single active view via `useLiveCollection`, and is unsubscribed on unmount.
-- Dashboards read `dashboard_stats`; milestone status is recomputed by Cloud
-  Functions (write-trigger + nightly schedule), never on the client.
+- Every mutation goes through an `/api/*` route that updates `dashboard_stats`
+  and `activity_daily` **in the same batch** as the ticket/submission/comment
+  write. Milestone status is recomputed there and by `/api/cron/update-status`
+  (Vercel Cron, daily) — never on the client.
 
 ## Loading / error / empty
 
@@ -190,7 +197,6 @@ button, `<EmptyState>` with real copy. Write actions fire a `sonner` toast.
 
 ```bash
 firebase deploy --only firestore:rules,firestore:indexes
-cd functions && npm install && npm run deploy   # Cloud Functions
 ```
 
 ---
