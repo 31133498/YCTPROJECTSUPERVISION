@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
 
   let body: {
     studentId?: string;
+    studentEmail?: string;
     title?: string;
     abstract?: string;
     defenseDate?: string | null;
@@ -31,19 +32,32 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  const { studentId, title, abstract, defenseDate = null } = body;
-  if (!studentId || !title?.trim() || !abstract?.trim()) {
+  const { studentId, studentEmail, title, abstract, defenseDate = null } = body;
+  if ((!studentId && !studentEmail) || !title?.trim() || !abstract?.trim()) {
     return NextResponse.json(
-      { error: "studentId, title and abstract are required" },
+      { error: "A student (id or email), title and abstract are required" },
       { status: 400 }
     );
   }
 
   const db = getAdminDb();
-  const studentSnap = await db.doc(`users/${studentId}`).get();
-  const student = studentSnap.data();
-  if (!studentSnap.exists || student?.role !== "student") {
-    return NextResponse.json({ error: "Student not found" }, { status: 404 });
+  let studentSnap;
+  if (studentId) {
+    studentSnap = await db.doc(`users/${studentId}`).get();
+  } else {
+    const q = await db
+      .collection("users")
+      .where("email", "==", studentEmail!.trim().toLowerCase())
+      .limit(1)
+      .get();
+    studentSnap = q.docs[0];
+  }
+  const student = studentSnap?.data();
+  if (!studentSnap?.exists || student?.role !== "student") {
+    return NextResponse.json(
+      { error: "No student account found for that email" },
+      { status: 404 }
+    );
   }
   if (student.department !== user.department) {
     return NextResponse.json(
@@ -58,6 +72,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const resolvedStudentId = studentSnap.id;
   const projectRef = db.collection("projects").doc();
   const batch = db.batch();
 
@@ -68,7 +83,7 @@ export async function POST(req: NextRequest) {
     status: "active",
     milestoneStatus: "on_track",
     milestoneReason: "On schedule",
-    studentId,
+    studentId: resolvedStudentId,
     studentName: student.displayName,
     supervisorId: user.uid,
     supervisorName: user.name ?? "",
@@ -101,7 +116,7 @@ export async function POST(req: NextRequest) {
     { merge: true }
   );
 
-  queueNotification(batch, db, studentId, {
+  queueNotification(batch, db, resolvedStudentId, {
     kind: "project",
     title: `${user.name ?? "Your supervisor"} created your project "${title.trim()}"`,
     href: `/student/project/${projectRef.id}`,

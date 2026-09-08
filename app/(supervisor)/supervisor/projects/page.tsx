@@ -9,14 +9,12 @@ import { getSupervisorProjectsPage } from "@/lib/firestore";
 import { usePaginatedQuery } from "@/hooks/use-paginated-query";
 import { QueryState } from "@/components/shared/query-state";
 import { EmptyState } from "@/components/shared/empty-state";
-import { TableSkeleton } from "@/components/shared/skeletons";
+import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { TableSkeleton } from "@/components/shared/skeletons";
+import { NewProjectDialog } from "@/components/shared/new-project-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -25,7 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatRelativeTime } from "@/lib/format";
 import type { ProjectStatus } from "@/lib/types";
 
 const STATUS_TABS: { value: ProjectStatus; label: string }[] = [
@@ -35,33 +33,34 @@ const STATUS_TABS: { value: ProjectStatus; label: string }[] = [
   { value: "archived", label: "Archived" },
 ];
 
-export default function SupervisorProjectsPage() {
+export default function SupervisorProjects() {
   const { user } = useAuth();
   const uid = user?.uid ?? "";
   const [status, setStatus] = useState<ProjectStatus>("active");
+  const [nonce, setNonce] = useState(0);
 
   const query = usePaginatedQuery(
     (params) => getSupervisorProjectsPage(uid, status, params),
-    [uid, status]
+    [uid, status, nonce]
   );
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-xl font-semibold">Projects</h1>
-        <p className="text-sm text-muted-foreground">
-          Projects where you are the assigned supervisor.
-        </p>
-      </header>
+    <div>
+      <PageHeader
+        title="Projects"
+        description="Projects where you are the assigned supervisor."
+        actions={<NewProjectDialog onCreated={() => setNonce((n) => n + 1)} />}
+      />
 
       <Tabs
         value={status}
         onValueChange={(v) => setStatus(v as ProjectStatus)}
+        className="mb-4"
       >
         <TabsList>
-          {STATUS_TABS.map((tab) => (
-            <TabsTrigger key={tab.value} value={tab.value}>
-              {tab.label}
+          {STATUS_TABS.map((t) => (
+            <TabsTrigger key={t.value} value={t.value}>
+              {t.label}
             </TabsTrigger>
           ))}
         </TabsList>
@@ -71,44 +70,52 @@ export default function SupervisorProjectsPage() {
         phase={query.phase}
         error={query.error}
         onRetry={query.retry}
-        skeleton={<TableSkeleton rows={8} columns={5} />}
+        skeleton={<TableSkeleton rows={6} columns={5} />}
         empty={
           <EmptyState
             icon={FolderKanban}
             title={`No ${status} projects`}
-            description="Projects assigned to you with this status will be listed here."
+            description={
+              status === "active"
+                ? "Create a project for one of your students to get started."
+                : "Nothing here with this status."
+            }
           />
         }
       >
-        <div className="rounded-lg border">
+        <div className="overflow-hidden rounded-lg border">
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="bg-surface/60">
                 <TableHead>Project</TableHead>
                 <TableHead>Student</TableHead>
                 <TableHead>Milestone</TableHead>
-                <TableHead>Next deadline</TableHead>
-                <TableHead className="text-right">Progress</TableHead>
+                <TableHead>Defense</TableHead>
+                <TableHead className="text-right">Updated</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {query.items.map((project) => (
-                <TableRow key={project.id}>
+              {query.items.map((p) => (
+                <TableRow key={p.id} className="group">
                   <TableCell className="font-medium">
                     <Link
-                      href={`/supervisor/projects/${project.id}`}
-                      className="underline-offset-4 hover:underline"
+                      href={`/supervisor/projects/${p.id}`}
+                      className="hover:underline"
                     >
-                      {project.title}
+                      {p.title}
                     </Link>
                   </TableCell>
-                  <TableCell>{project.studentName}</TableCell>
-                  <TableCell>
-                    <StatusBadge status={project.milestoneStatus} />
+                  <TableCell className="text-muted-foreground">
+                    {p.studentName}
                   </TableCell>
-                  <TableCell>{formatDate(project.nextDeadline)}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {project.progressPct}%
+                  <TableCell>
+                    <StatusBadge status={p.milestoneStatus} />
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {formatDate(p.defenseDate)}
+                  </TableCell>
+                  <TableCell className="text-right text-2xs text-muted-foreground">
+                    {formatRelativeTime(p.lastActivityAt)}
                   </TableCell>
                 </TableRow>
               ))}

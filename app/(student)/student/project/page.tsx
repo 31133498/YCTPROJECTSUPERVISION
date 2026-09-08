@@ -1,62 +1,49 @@
 "use client";
 
-import Link from "next/link";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { FolderKanban } from "lucide-react";
 
 import { useAuth } from "@/lib/auth/auth-context";
 import { getStudentProjectsPage } from "@/lib/firestore";
-import { usePaginatedQuery } from "@/hooks/use-paginated-query";
+import { useAsyncData } from "@/hooks/use-async-data";
 import { QueryState } from "@/components/shared/query-state";
 import { EmptyState } from "@/components/shared/empty-state";
-import { ListSkeleton } from "@/components/shared/skeletons";
-import { StatusBadge } from "@/components/shared/status-badge";
+import { PageHeader } from "@/components/shared/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { ProjectDoc } from "@/lib/types";
 
-export default function StudentProjectIndexPage() {
+export default function StudentProjectIndex() {
   const { user } = useAuth();
+  const router = useRouter();
   const uid = user?.uid ?? "";
-  const query = usePaginatedQuery(
-    (params) => getStudentProjectsPage(uid, params),
-    [uid]
-  );
+
+  const project = useAsyncData<ProjectDoc | null>(async () => {
+    const page = await getStudentProjectsPage(uid, { pageSize: 1 });
+    return page.items[0] ?? null;
+  }, [uid]);
+
+  useEffect(() => {
+    if (project.data) router.replace(`/student/project/${project.data.id}`);
+  }, [project.data, router]);
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-xl font-semibold">My project</h1>
-      </header>
+    <div>
+      <PageHeader title="My project" />
       <QueryState
-        phase={query.phase}
-        error={query.error}
-        onRetry={query.retry}
-        skeleton={<ListSkeleton rows={2} />}
+        phase={project.phase}
+        error={project.error}
+        onRetry={project.retry}
+        skeleton={<Skeleton className="h-40 rounded-lg" />}
         empty={
           <EmptyState
             icon={FolderKanban}
-            title="Nothing here yet"
+            title="No project yet"
             description="Your supervisor hasn't created your project record."
           />
         }
       >
-        <ul className="divide-y rounded-lg border">
-          {query.items.map((project) => (
-            <li key={project.id}>
-              <Link
-                href={`/student/project/${project.id}`}
-                className="flex items-center justify-between gap-3 p-4 hover:bg-accent/50"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">
-                    {project.title}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {project.supervisorName}
-                  </p>
-                </div>
-                <StatusBadge status={project.milestoneStatus} />
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <Skeleton className="h-40 rounded-lg" />
       </QueryState>
     </div>
   );

@@ -32,7 +32,8 @@ async function req<T = unknown>(
 
 export const api = {
   createProject: (input: {
-    studentId: string;
+    studentId?: string;
+    studentEmail?: string;
     title: string;
     abstract: string;
     defenseDate?: string | null;

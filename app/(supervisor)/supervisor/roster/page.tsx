@@ -1,76 +1,92 @@
 "use client";
 
+import Link from "next/link";
 import { Users } from "lucide-react";
 
 import { useAuth } from "@/lib/auth/auth-context";
-import { getRosterPage } from "@/lib/firestore";
+import { getSupervisorProjectsPage } from "@/lib/firestore";
 import { usePaginatedQuery } from "@/hooks/use-paginated-query";
 import { QueryState } from "@/components/shared/query-state";
 import { EmptyState } from "@/components/shared/empty-state";
-import { ListSkeleton } from "@/components/shared/skeletons";
+import { PageHeader } from "@/components/shared/page-header";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { CardGridSkeleton } from "@/components/shared/skeletons";
+import { NewProjectDialog } from "@/components/shared/new-project-dialog";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Avatar,
-  AvatarFallback,
-} from "@/components/ui/avatar";
+import { Progress } from "@/components/ui/progress";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { formatDate } from "@/lib/format";
 
-export default function SupervisorRosterPage() {
+function initials(n: string) {
+  return n
+    .split(/\s+/)
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
+export default function SupervisorRoster() {
   const { user } = useAuth();
   const uid = user?.uid ?? "";
   const query = usePaginatedQuery(
-    (params) => getRosterPage(uid, params),
+    (params) => getSupervisorProjectsPage(uid, "active", params),
     [uid]
   );
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-xl font-semibold">Roster</h1>
-        <p className="text-sm text-muted-foreground">
-          Students assigned to you (indexed by <code>supervisorId</code>).
-        </p>
-      </header>
+    <div>
+      <PageHeader
+        title="Roster"
+        description="Your students and their live milestone status."
+        actions={<NewProjectDialog onCreated={query.retry} />}
+      />
 
       <QueryState
         phase={query.phase}
         error={query.error}
         onRetry={query.retry}
-        skeleton={<ListSkeleton rows={6} />}
+        skeleton={<CardGridSkeleton count={6} />}
         empty={
           <EmptyState
             icon={Users}
-            title="No students assigned"
-            description="When the HOD assigns students to you they'll appear here."
+            title="No students yet"
+            description="Create a project for a student and they'll appear here."
           />
         }
       >
-        <ul className="divide-y rounded-lg border">
-          {query.items.map((student) => (
-            <li
-              key={student.id}
-              className="flex items-center gap-3 p-4"
-            >
-              <Avatar className="h-9 w-9">
-                <AvatarFallback className="text-xs">
-                  {student.displayName
-                    .split(" ")
-                    .map((p) => p[0])
-                    .slice(0, 2)
-                    .join("")
-                    .toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">
-                  {student.displayName}
-                </p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {student.email}
-                </p>
-              </div>
-            </li>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {query.items.map((p) => (
+            <Card key={p.id} interactive className="overflow-hidden">
+              <Link href={`/supervisor/projects/${p.id}`}>
+                <CardContent className="space-y-3 p-4">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-9 w-9">
+                      <AvatarFallback className="text-2xs">
+                        {initials(p.studentName)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">
+                        {p.studentName}
+                      </p>
+                      <p className="truncate text-2xs text-muted-foreground">
+                        {p.title}
+                      </p>
+                    </div>
+                    <StatusBadge status={p.milestoneStatus} dot={false} />
+                  </div>
+                  <Progress value={p.progressPct} />
+                  <div className="flex justify-between text-2xs text-muted-foreground">
+                    <span>Defense {formatDate(p.defenseDate)}</span>
+                    <span className="tnum">{p.progressPct}%</span>
+                  </div>
+                </CardContent>
+              </Link>
+            </Card>
           ))}
-        </ul>
+        </div>
         {query.hasMore && (
           <div className="mt-3 flex justify-center">
             <Button

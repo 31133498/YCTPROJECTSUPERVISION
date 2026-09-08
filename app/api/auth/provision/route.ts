@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
   batch.set(userRef, {
     uid,
     displayName: displayName.trim(),
-    email: email ?? "",
+    email: (email ?? "").toLowerCase(),
     role,
     department,
     createdAt: FieldValue.serverTimestamp(),
