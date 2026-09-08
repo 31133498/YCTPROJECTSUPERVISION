@@ -62,7 +62,12 @@ export function TicketList({
       {phase === "ready" && (
         <ul className="divide-y rounded-lg border">
           {items.map((t) => (
-            <TicketRow key={t.id} projectId={projectId} ticket={t} />
+            <TicketRow
+              key={t.id}
+              projectId={projectId}
+              ticket={t}
+              editable={canPost}
+            />
           ))}
         </ul>
       )}
@@ -73,9 +78,11 @@ export function TicketList({
 function TicketRow({
   projectId,
   ticket: t,
+  editable,
 }: {
   projectId: string;
   ticket: TicketDoc;
+  editable: boolean;
 }) {
   const [saving, setSaving] = useState(false);
 
@@ -114,22 +121,25 @@ function TicketRow({
           {t.dueDate ? ` · due ${t.dueDate}` : ""}
         </p>
       </div>
-      <Select
-        value={t.status}
-        onValueChange={(v) => setStatus(v as TicketStatus)}
-        disabled={saving}
-      >
-        <SelectTrigger className="h-8 w-[140px]">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="open">Open</SelectItem>
-          <SelectItem value="in_progress">In progress</SelectItem>
-          <SelectItem value="blocked">Blocked</SelectItem>
-          <SelectItem value="done">Done</SelectItem>
-        </SelectContent>
-      </Select>
-      <StatusBadge status={t.status} />
+      {editable ? (
+        <Select
+          value={t.status}
+          onValueChange={(v) => setStatus(v as TicketStatus)}
+          disabled={saving}
+        >
+          <SelectTrigger className="h-8 w-[140px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="open">Open</SelectItem>
+            <SelectItem value="in_progress">In progress</SelectItem>
+            <SelectItem value="blocked">Blocked</SelectItem>
+            <SelectItem value="done">Done</SelectItem>
+          </SelectContent>
+        </Select>
+      ) : (
+        <StatusBadge status={t.status} />
+      )}
     </li>
   );
 }

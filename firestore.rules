@@ -95,6 +95,17 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ---- activity_daily/{id} ---------------------------------------
+    // Per-department daily activity buckets for the HOD analytics chart.
+    // Admin SDK writes only.
+    match /activity_daily/{docId} {
+      allow read: if isHod() && resource.data.department == department();
+      allow list: if isHod()
+        && request.query.limit <= 120
+        && resource.data.department == department();
+      allow write: if false;
+    }
+
     // ---- projects/{projectId} ---------------------------------------
     match /projects/{projectId} {
       allow get: if canReadProject(resource.data);

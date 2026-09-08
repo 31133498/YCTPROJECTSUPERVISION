@@ -6,6 +6,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { canReadProject } from "@/lib/server/project-access";
 import { loadProjectAdmin } from "@/lib/server/project-writes";
 import { queueNotification } from "@/lib/server/notify";
+import { bumpDailyActivity } from "@/lib/server/activity";
 import { projectHref } from "@/lib/routes";
 
 export const runtime = "nodejs";
@@ -93,6 +94,8 @@ export async function POST(
       actorName: user.name ?? "",
     }
   );
+
+  bumpDailyActivity(batch, db, project.department, "comments");
 
   await batch.commit();
   return NextResponse.json({ status: "ok", commentId: commentRef.id });

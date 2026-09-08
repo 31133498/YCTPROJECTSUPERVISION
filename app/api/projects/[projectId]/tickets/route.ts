@@ -6,6 +6,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { bumpStats } from "@/lib/server/stats";
 import { applyMilestone, loadProjectAdmin } from "@/lib/server/project-writes";
 import { queueNotification } from "@/lib/server/notify";
+import { bumpDailyActivity } from "@/lib/server/activity";
 import { projectHref } from "@/lib/routes";
 import type { TicketPriority } from "@/lib/types";
 
@@ -112,6 +113,8 @@ export async function POST(
       { merge: true }
     );
   }
+
+  bumpDailyActivity(batch, db, project.department, "tickets");
 
   await batch.commit();
   return NextResponse.json({ status: "ok", ticketId: ticketRef.id });

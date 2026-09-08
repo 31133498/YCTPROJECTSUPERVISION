@@ -1,80 +1,102 @@
 "use client";
 
-import { Users } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, Users } from "lucide-react";
 
 import { useAuth } from "@/lib/auth/auth-context";
-import { getDepartmentUsersPage } from "@/lib/firestore";
-import { usePaginatedQuery } from "@/hooks/use-paginated-query";
+import { getDepartmentDashboardStats } from "@/lib/firestore";
+import { useAsyncData } from "@/hooks/use-async-data";
 import { QueryState } from "@/components/shared/query-state";
 import { EmptyState } from "@/components/shared/empty-state";
-import { ListSkeleton } from "@/components/shared/skeletons";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/shared/page-header";
+import { CardGridSkeleton } from "@/components/shared/skeletons";
+import { Card, CardContent } from "@/components/ui/card";
+import type { DashboardStatsDoc } from "@/lib/types";
 
-export default function HodSupervisorsPage() {
+export default function HodSupervisors() {
   const { claims } = useAuth();
-  const department = claims.department ?? "";
-  const query = usePaginatedQuery(
-    (params) => getDepartmentUsersPage(department, params),
-    [department]
+  const dept = claims.department ?? "";
+  const rollups = useAsyncData<DashboardStatsDoc[]>(
+    () => getDepartmentDashboardStats(dept),
+    [dept]
   );
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-xl font-semibold">Department members</h1>
-        <p className="text-sm text-muted-foreground">
-          Everyone in {department || "the department"} — supervisors, students
-          and staff.
-        </p>
-      </header>
-
+    <div>
+      <PageHeader
+        title="Supervisors"
+        description="Load and responsiveness per supervisor. Click through for the drill-down."
+      />
       <QueryState
-        phase={query.phase}
-        error={query.error}
-        onRetry={query.retry}
-        skeleton={<ListSkeleton rows={8} />}
+        phase={rollups.phase}
+        error={rollups.error}
+        onRetry={rollups.retry}
+        skeleton={<CardGridSkeleton count={6} />}
         empty={
           <EmptyState
             icon={Users}
-            title="No members"
-            description="Provisioned department accounts will be listed here."
+            title="No supervisors yet"
+            description="Supervisor accounts with active projects appear here."
           />
         }
       >
-        <ul className="divide-y rounded-lg border">
-          {query.items.map((member) => (
-            <li
-              key={member.id}
-              className="flex items-center justify-between gap-3 p-4"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">
-                  {member.displayName}
-                </p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {member.email}
-                </p>
-              </div>
-              <Badge variant="secondary" className="capitalize">
-                {member.role}
-              </Badge>
-            </li>
-          ))}
-        </ul>
-        {query.hasMore && (
-          <div className="mt-3 flex justify-center">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={query.loadMore}
-              disabled={query.loadingMore}
-            >
-              {query.loadingMore ? "Loading…" : "Load more"}
-            </Button>
-          </div>
-        )}
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {(rollups.data ?? [])
+            .slice()
+            .sort((a, b) => b.overdueCount - a.overdueCount)
+            .map((r) => (
+              <Card key={r.id} interactive>
+                <Link href={`/hod/supervisors/${r.supervisorId}`}>
+                  <CardContent className="space-y-3 p-4">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">{r.supervisorName}</p>
+                      <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <Stat label="Active" value={r.activeProjects} />
+                      <Stat label="Overdue" value={r.overdueCount} tone="amber" />
+                      <Stat
+                        label="Response"
+                        value={
+                          r.avgResponseHours == null
+                            ? "—"
+                            : `${r.avgResponseHours}h`
+                        }
+                      />
+                    </div>
+                  </CardContent>
+                </Link>
+              </Card>
+            ))}
+        </div>
       </QueryState>
+    </div>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number | string;
+  tone?: "amber";
+}) {
+  return (
+    <div>
+      <p
+        className={
+          tone === "amber" && value !== 0
+            ? "text-lg font-semibold tnum text-[hsl(var(--status-behind))]"
+            : "text-lg font-semibold tnum"
+        }
+      >
+        {value}
+      </p>
+      <p className="text-2xs uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
     </div>
   );
 }

@@ -139,15 +139,20 @@ function Inner({
                       <Progress value={project.data.progressPct} />
                     </div>
                     <div className="grid gap-4 sm:grid-cols-3">
-                      <Fact
-                        icon={role === "student" ? GraduationCap : User}
-                        label={role === "student" ? "Supervisor" : "Student"}
-                        value={
-                          role === "student"
-                            ? project.data.supervisorName
-                            : project.data.studentName
-                        }
-                      />
+                      {role !== "student" && (
+                        <Fact
+                          icon={User}
+                          label="Student"
+                          value={project.data.studentName}
+                        />
+                      )}
+                      {role !== "supervisor" && (
+                        <Fact
+                          icon={GraduationCap}
+                          label="Supervisor"
+                          value={project.data.supervisorName}
+                        />
+                      )}
                       <Fact
                         icon={CalendarClock}
                         label="Defense date"
@@ -170,7 +175,7 @@ function Inner({
               </TabsContent>
 
               <TabsContent value="tickets" className="mt-4">
-                <TicketList projectId={projectId} />
+                <TicketList projectId={projectId} canPost={role !== "hod"} />
               </TabsContent>
 
               <TabsContent value="submissions" className="mt-4">
