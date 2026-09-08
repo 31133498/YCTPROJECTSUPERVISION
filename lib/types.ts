@@ -62,6 +62,8 @@ export interface ProjectDoc extends DocBase {
   department: string;
   status: ProjectStatus;
   milestoneStatus: MilestoneStatus;
+  /** Human-readable reason for the current milestoneStatus (from lib/milestone). */
+  milestoneReason: string;
   /** Denormalised for list rendering without extra reads. */
   studentId: string;
   studentName: string;
@@ -69,8 +71,16 @@ export interface ProjectDoc extends DocBase {
   supervisorName: string;
   /** ISO date (yyyy-mm-dd) of the next milestone deadline. */
   nextDeadline: string | null;
+  /** ISO date (yyyy-mm-dd) of the project defense. */
+  defenseDate: string | null;
   progressPct: number;
   openTicketCount: number;
+  /** Rolling denormalised count — trailing 30 days. Maintained on ticket write. */
+  ticketsLast30Days: number;
+  /** Most recent submission upload time. */
+  lastSubmissionAt: Timestamp | null;
+  /** Whether a `final` submission has been approved. */
+  finalApproved: boolean;
   lastActivityAt: Timestamp;
 }
 
@@ -99,6 +109,8 @@ export interface SubmissionDoc extends DocBase {
   submittedById: string;
   submittedByName: string;
   commentCount: number;
+  /** When the assigned supervisor first commented — feeds the responsiveness metric. */
+  firstResponseAt: Timestamp | null;
 }
 
 export interface CommentDoc extends DocBase {
@@ -123,8 +135,19 @@ export interface DashboardStatsDoc extends DocBase {
   overdueCount: number;
   pendingSubmissions: number;
   openTickets: number;
+  /** Avg hours between a student submission and the supervisor's first comment. */
+  avgResponseHours: number | null;
   byMilestoneStatus: Record<MilestoneStatus, number>;
   lastActivityAt: Timestamp;
+}
+
+/** One point on the HOD "supervision activity over time" chart. */
+export interface ActivityPointDoc {
+  /** yyyy-mm-dd (bucket day). */
+  day: string;
+  submissions: number;
+  comments: number;
+  tickets: number;
 }
 
 /** Shape used by the shared activity <Timeline />. */

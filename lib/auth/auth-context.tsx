@@ -16,15 +16,26 @@ import {
 } from "react";
 import {
   GoogleAuthProvider,
+  createUserWithEmailAndPassword,
   onIdTokenChanged,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
+  updateProfile,
   type User,
 } from "firebase/auth";
 
 import { getFirebaseAuth } from "@/lib/firebase";
+import { api } from "@/lib/api";
 import type { Role } from "@/lib/types";
+
+export interface SignUpInput {
+  displayName: string;
+  email: string;
+  password: string;
+  role: Role;
+  department: string;
+}
 
 interface AuthClaimsState {
   role: Role | null;
@@ -38,6 +49,7 @@ interface AuthContextValue {
   loading: boolean;
   signInWithPassword: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  signUp: (input: SignUpInput) => Promise<Role>;
   signOutUser: () => Promise<void>;
 }
 
@@ -96,6 +108,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signInWithPopup(getFirebaseAuth(), new GoogleAuthProvider());
   }, []);
 
+  const signUp = useCallback(async (input: SignUpInput): Promise<Role> => {
+    const auth = getFirebaseAuth();
+    const cred = await createUserWithEmailAndPassword(
+      auth,
+      input.email.trim(),
+      input.password
+    );
+    await updateProfile(cred.user, { displayName: input.displayName.trim() });
+    const idToken = await cred.user.getIdToken();
+    await api.provisionAccount({
+      idToken,
+      role: input.role,
+      department: input.department,
+      displayName: input.displayName.trim(),
+    });
+    // Force a token refresh so the new custom claims land, which re-fires
+    // onIdTokenChanged -> session cookie is minted with role + department.
+    await cred.user.getIdToken(true);
+    return input.role;
+  }, []);
+
   const signOutUser = useCallback(async () => {
     await signOut(getFirebaseAuth());
   }, []);
@@ -107,9 +140,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       signInWithPassword,
       signInWithGoogle,
+      signUp,
       signOutUser,
     }),
-    [user, claims, loading, signInWithPassword, signInWithGoogle, signOutUser]
+    [
+      user,
+      claims,
+      loading,
+      signInWithPassword,
+      signInWithGoogle,
+      signUp,
+      signOutUser,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

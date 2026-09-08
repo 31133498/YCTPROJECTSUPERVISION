@@ -1,22 +1,12 @@
-/** Typed query functions for `projects/{projectId}`. One export per query. */
-import {
-  addDoc,
-  collection,
-  doc,
-  getDoc,
-  orderBy,
-  query,
-  serverTimestamp,
-  updateDoc,
-  where,
-} from "firebase/firestore";
+/**
+ * Typed READ queries for `projects/{projectId}`. All writes go through
+ * `/api/*` route handlers (server, admin) so `dashboard_stats` can be updated in
+ * the same batch — see `lib/api/projects.ts`.
+ */
+import { collection, doc, getDoc, orderBy, query, where } from "firebase/firestore";
 
 import { getDb } from "@/lib/firebase";
-import type {
-  MilestoneStatus,
-  ProjectDoc,
-  ProjectStatus,
-} from "@/lib/types";
+import type { MilestoneStatus, ProjectDoc, ProjectStatus } from "@/lib/types";
 import { projectConverter } from "./converters";
 import { fetchPage, type Page, type PageParams } from "./pagination";
 import { paths } from "./paths";
@@ -52,7 +42,7 @@ export function getSupervisorProjectsPage(
 }
 
 /**
- * HOD department-wide project list, filtered by milestone health.
+ * HOD department-wide project list, optionally filtered by milestone health.
  * Composite index: (department ==, milestoneStatus ==, lastActivityAt desc).
  */
 export function getDepartmentProjectsPage(
@@ -76,7 +66,7 @@ export function getDepartmentProjectsPage(
   return fetchPage(q, params);
 }
 
-/** The single project owned by a student. */
+/** The project(s) owned by a student (normally exactly one). */
 export function getStudentProjectsPage(
   studentId: string,
   params?: PageParams
@@ -87,42 +77,4 @@ export function getStudentProjectsPage(
     orderBy("lastActivityAt", "desc")
   );
   return fetchPage(q, params);
-}
-
-export interface CreateProjectInput {
-  title: string;
-  abstract: string;
-  department: string;
-  studentId: string;
-  studentName: string;
-  supervisorId: string;
-  supervisorName: string;
-}
-
-export async function createProject(
-  input: CreateProjectInput
-): Promise<string> {
-  const ref = await addDoc(projectsCol(), {
-    ...input,
-    status: "active" satisfies ProjectStatus,
-    milestoneStatus: "on_track" satisfies MilestoneStatus,
-    nextDeadline: null,
-    progressPct: 0,
-    openTicketCount: 0,
-    createdAt: serverTimestamp() as never,
-    updatedAt: serverTimestamp() as never,
-    lastActivityAt: serverTimestamp() as never,
-  } as Partial<ProjectDoc>);
-  return ref.id;
-}
-
-export async function updateProjectStatus(
-  projectId: string,
-  status: ProjectStatus
-): Promise<void> {
-  await updateDoc(doc(getDb(), paths.project(projectId)), {
-    status,
-    updatedAt: serverTimestamp(),
-    lastActivityAt: serverTimestamp(),
-  });
 }

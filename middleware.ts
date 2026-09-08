@@ -11,7 +11,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * layout via `requireRole()`, and again in Firestore rules / Supabase signing.
  */
 const SESSION_COOKIE = "__session";
-const PUBLIC_PATHS = ["/login"];
+const PUBLIC_PATHS = ["/login", "/signup"];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

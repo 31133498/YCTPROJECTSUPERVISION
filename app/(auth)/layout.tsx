@@ -1,4 +1,4 @@
-import { GraduationCap } from "lucide-react";
+import Link from "next/link";
 
 export default function AuthLayout({
   children,
@@ -6,17 +6,26 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-muted/30 p-4">
-      <div className="mb-6 flex items-center gap-2">
-        <GraduationCap className="h-6 w-6 text-primary" />
-        <span className="text-base font-semibold">
-          Digital Project Supervision
+    <div className="flex min-h-screen flex-col bg-surface">
+      <header className="mx-auto flex w-full max-w-md items-center gap-2 px-6 pt-10">
+        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-foreground text-background">
+          <span className="text-xs font-bold">P</span>
+        </div>
+        <span className="text-sm font-semibold tracking-tight">
+          Project Supervision
         </span>
-      </div>
-      {children}
-      <p className="mt-6 text-xs text-muted-foreground">
-        YABATECH ND Project &middot; Progress Tracking System
-      </p>
+      </header>
+
+      <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 py-12">
+        {children}
+      </main>
+
+      <footer className="mx-auto w-full max-w-md px-6 pb-10 text-xs text-muted-foreground">
+        YABATECH ND · Digital Project Supervision &amp; Progress Tracking ·{" "}
+        <Link href="/login" className="underline-offset-4 hover:underline">
+          Sign in
+        </Link>
+      </footer>
     </div>
   );
 }
