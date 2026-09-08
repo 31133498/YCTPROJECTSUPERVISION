@@ -1,11 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
- * Edge gate: presence check only. The Admin SDK can't run on the edge, so this
- * does NOT verify the cookie or read claims — it just keeps unauthenticated
- * traffic off protected routes and signed-in users off /login. Full
- * verification + role enforcement happens in each route group's server layout
- * via `requireRole()`, and again in Firestore/Storage rules.
+ * Edge gate for PAGE navigations: presence check only. The Admin SDK can't run
+ * on the edge, so this does NOT verify the cookie or read claims — it just keeps
+ * unauthenticated traffic off protected pages and signed-in users off /login.
+ *
+ * `/api/*` is deliberately NOT matched: route handlers authenticate themselves
+ * with `getSessionUser()` and must return JSON 401/403, never an HTML redirect.
+ * Full verification + role enforcement lives in each route group's server
+ * layout via `requireRole()`, and again in Firestore rules / Supabase signing.
  */
 const SESSION_COOKIE = "__session";
 const PUBLIC_PATHS = ["/login"];
@@ -35,6 +38,6 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // Everything except Next internals, the session route, and static assets.
-  matcher: ["/((?!api/session|_next/static|_next/image|favicon.ico).*)"],
+  // Page routes only — never /api/*, Next internals, or static assets.
+  matcher: ["/((?!api/|_next/static|_next/image|favicon.ico).*)"],
 };
