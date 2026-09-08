@@ -1,0 +1,66 @@
+import {
+  FileText,
+  GitCommitHorizontal,
+  MessageSquare,
+  Ticket,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+
+import type { ActivityEvent } from "@/lib/types";
+import { formatRelativeTime } from "@/lib/format";
+import { cn } from "@/lib/utils";
+
+const ICONS: Record<ActivityEvent["kind"], LucideIcon> = {
+  ticket: Ticket,
+  submission: FileText,
+  comment: MessageSquare,
+  status_change: GitCommitHorizontal,
+};
+
+/** Cross-role activity feed. Pure presentational — feed it `ActivityEvent[]`. */
+export function Timeline({
+  events,
+  className,
+}: {
+  events: ActivityEvent[];
+  className?: string;
+}) {
+  return (
+    <ol className={cn("relative space-y-6", className)}>
+      {events.map((event, i) => {
+        const Icon = ICONS[event.kind];
+        const isLast = i === events.length - 1;
+        return (
+          <li key={event.id} className="relative flex gap-3">
+            {!isLast && (
+              <span
+                aria-hidden
+                className="absolute left-[13px] top-7 h-[calc(100%+0.5rem)] w-px bg-border"
+              />
+            )}
+            <span className="z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border bg-background text-muted-foreground">
+              <Icon className="h-3.5 w-3.5" />
+            </span>
+            <div className="min-w-0 flex-1 pt-0.5">
+              <p className="text-sm">
+                {event.href ? (
+                  <a
+                    href={event.href}
+                    className="font-medium underline-offset-4 hover:underline"
+                  >
+                    {event.title}
+                  </a>
+                ) : (
+                  <span className="font-medium">{event.title}</span>
+                )}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {event.actorName} &middot; {formatRelativeTime(event.at)}
+              </p>
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}

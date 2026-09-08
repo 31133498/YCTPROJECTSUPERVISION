@@ -1,0 +1,152 @@
+rules_version = '2';
+
+// Role-based access control driven by custom claims (request.auth.token.role,
+// request.auth.token.department). Claims are set server-side via the Admin SDK.
+// There is NO client-side-only access control anywhere in this app — these
+// rules are the enforcement boundary, together with storage.rules.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- helpers ---------------------------------------------------------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function role() {
+      return request.auth.token.role;
+    }
+    function department() {
+      return request.auth.token.department;
+    }
+    function isStudent() { return isSignedIn() && role() == 'student'; }
+    function isSupervisor() { return isSignedIn() && role() == 'supervisor'; }
+    function isHod() { return isSignedIn() && role() == 'hod'; }
+
+    function existingProject(projectId) {
+      return get(/databases/$(database)/documents/projects/$(projectId)).data;
+    }
+    // Avoids a get() when the parent project doc is already being read/written.
+    function isProjectStudent(project) {
+      return isSignedIn() && project.studentId == request.auth.uid;
+    }
+    function isProjectSupervisor(project) {
+      return isSignedIn() && project.supervisorId == request.auth.uid;
+    }
+    function isProjectDepartmentHod(project) {
+      return isHod() && project.department == department();
+    }
+    function canReadProject(project) {
+      return isProjectStudent(project)
+          || isProjectSupervisor(project)
+          || isProjectDepartmentHod(project);
+    }
+    function canWriteProjectSubtree(project) {
+      return isProjectStudent(project) || isProjectSupervisor(project);
+    }
+
+    // ---- users/{uid} ---------------------------------------------------
+    match /users/{uid} {
+      // A user reads their own doc. Supervisors read their assigned students.
+      // HOD reads anyone in their department.
+      allow get: if isSignedIn() && (
+        request.auth.uid == uid
+        || (isSupervisor() && resource.data.supervisorId == request.auth.uid)
+        || (isHod() && resource.data.department == department())
+      );
+      allow list: if isSignedIn() && (
+        (isSupervisor()
+          && request.query.limit <= 50
+          && resource.data.supervisorId == request.auth.uid)
+        || (isHod()
+          && request.query.limit <= 100
+          && resource.data.department == department())
+      );
+
+      // Profile self-service only. Role / department / supervisorId are
+      // provisioned by the Admin SDK and are immutable from the client.
+      allow update: if request.auth.uid == uid
+        && !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['role', 'department', 'supervisorId', 'uid']);
+      allow create, delete: if false; // Admin SDK only.
+    }
+
+    // ---- dashboard_stats/{supervisorId} ------------------------------
+    // Denormalised counters. Read by the owning supervisor and by the HOD of
+    // the same department. Written ONLY by Cloud Functions (Admin SDK).
+    match /dashboard_stats/{supervisorId} {
+      allow get: if isSignedIn() && (
+        request.auth.uid == supervisorId
+        || (isHod() && resource.data.department == department())
+      );
+      allow list: if isHod()
+        && request.query.limit <= 100
+        && resource.data.department == department();
+      allow write: if false;
+    }
+
+    // ---- projects/{projectId} ---------------------------------------
+    match /projects/{projectId} {
+      allow get: if canReadProject(resource.data);
+      allow list: if isSignedIn() && (
+        (isSupervisor() && resource.data.supervisorId == request.auth.uid)
+        || (isHod() && resource.data.department == department())
+        || (isStudent() && resource.data.studentId == request.auth.uid)
+      );
+
+      // Supervisors manage their own projects. Students may update a bounded
+      // set of fields on their own project (e.g. abstract, progress note);
+      // status transitions and assignment stay with the supervisor.
+      allow create: if isSupervisor()
+        && request.resource.data.supervisorId == request.auth.uid
+        && request.resource.data.department == department();
+      allow update: if isProjectSupervisor(resource.data)
+        || (isProjectStudent(resource.data)
+            && !request.resource.data.diff(resource.data).affectedKeys()
+                  .hasAny(['supervisorId', 'studentId', 'department',
+                           'status', 'milestoneStatus']));
+      allow delete: if false;
+
+      // ---- projects/{projectId}/tickets/{ticketId} ----------------
+      match /tickets/{ticketId} {
+        function project() { return existingProject(projectId); }
+        allow read: if canReadProject(project());
+        allow create: if canWriteProjectSubtree(project())
+          && request.resource.data.authorId == request.auth.uid
+          && request.resource.data.projectId == projectId;
+        allow update: if canWriteProjectSubtree(project());
+        allow delete: if isProjectSupervisor(project());
+      }
+
+      // ---- projects/{projectId}/submissions/{submissionId} --------
+      match /submissions/{submissionId} {
+        function project() { return existingProject(projectId); }
+        allow read: if canReadProject(project());
+        // Only the project's student uploads submissions.
+        allow create: if isProjectStudent(project())
+          && request.resource.data.submittedById == request.auth.uid
+          && request.resource.data.projectId == projectId;
+        // Student can revise; supervisor sets review status.
+        allow update: if isProjectStudent(project())
+          || isProjectSupervisor(project());
+        allow delete: if false;
+
+        // ---- .../comments/{commentId} --------------------------
+        match /comments/{commentId} {
+          function project() { return existingProject(projectId); }
+          allow read: if canReadProject(project());
+          allow create: if canWriteProjectSubtree(project())
+            && request.resource.data.authorId == request.auth.uid;
+          // Comments are immutable once posted; author may delete their own.
+          allow update: if false;
+          allow delete: if isSignedIn()
+            && resource.data.authorId == request.auth.uid;
+        }
+      }
+    }
+
+    // Deny everything not explicitly matched above.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
