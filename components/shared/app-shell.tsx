@@ -15,10 +15,10 @@ import { NotificationBell } from "./notification-bell";
 function Brand() {
   return (
     <div className="flex items-center gap-2">
-      <div className="flex h-6 w-6 items-center justify-center rounded-md bg-foreground text-background">
-        <span className="text-xs font-bold">P</span>
+      <div className="flex h-6 w-6 items-center justify-center border-2 border-border bg-foreground text-background">
+        <span className="text-xs font-black">P</span>
       </div>
-      <span className="text-sm font-semibold tracking-tight">
+      <span className="text-sm font-black uppercase tracking-tight">
         Project Supervision
       </span>
     </div>
@@ -42,7 +42,7 @@ export function AppShell({
 
   return (
     <div className="grid min-h-screen grid-cols-1 md:grid-cols-[240px_1fr]">
-      <aside className="sticky top-0 hidden h-screen flex-col border-r bg-surface md:flex">
+      <aside className="sticky top-0 hidden h-screen flex-col border-r-2 border-border bg-surface md:flex">
         <div className="flex h-14 items-center px-4">
           <Brand />
         </div>
@@ -53,7 +53,7 @@ export function AppShell({
       </aside>
 
       <div className="flex min-w-0 flex-col">
-        <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b bg-background/80 px-3 backdrop-blur md:px-6">
+        <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b-2 border-border bg-background px-3 md:px-6">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
               <Button

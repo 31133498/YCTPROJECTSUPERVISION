@@ -47,25 +47,39 @@ interface AuthContextValue {
   claims: AuthClaimsState;
   /** `true` until the first auth state resolves — gate UI on this. */
   loading: boolean;
-  signInWithPassword: (email: string, password: string) => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
+  /** Resolves only AFTER the server session cookie is minted. Returns the role. */
+  signInWithPassword: (email: string, password: string) => Promise<Role>;
+  signInWithGoogle: () => Promise<Role>;
   signUp: (input: SignUpInput) => Promise<Role>;
   signOutUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-async function syncSessionCookie(user: User | null): Promise<void> {
+/**
+ * Mint (or clear) the HttpOnly `__session` cookie and WAIT for it. Interactive
+ * auth flows must await this before navigating, otherwise the router hits a
+ * protected route before the cookie exists and middleware bounces it.
+ */
+async function syncSessionCookie(
+  user: User | null,
+  forceRefresh = false
+): Promise<Role | null> {
   if (!user) {
     await fetch("/api/session", { method: "DELETE" });
-    return;
+    return null;
   }
-  const idToken = await user.getIdToken();
-  await fetch("/api/session", {
+  const result = await user.getIdTokenResult(forceRefresh);
+  const res = await fetch("/api/session", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ idToken }),
+    body: JSON.stringify({ idToken: result.token }),
   });
+  if (!res.ok) {
+    const { error } = await res.json().catch(() => ({}));
+    throw new Error(error || "Could not establish a session.");
+  }
+  return (result.claims.role as Role | undefined) ?? null;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -98,14 +112,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signInWithPassword = useCallback(
-    async (email: string, password: string) => {
-      await signInWithEmailAndPassword(getFirebaseAuth(), email, password);
+    async (email: string, password: string): Promise<Role> => {
+      const cred = await signInWithEmailAndPassword(
+        getFirebaseAuth(),
+        email,
+        password
+      );
+      const role = await syncSessionCookie(cred.user);
+      if (!role) {
+        throw new Error(
+          "This account has no role assigned yet. Ask an admin to provision it."
+        );
+      }
+      return role;
     },
     []
   );
 
-  const signInWithGoogle = useCallback(async () => {
-    await signInWithPopup(getFirebaseAuth(), new GoogleAuthProvider());
+  const signInWithGoogle = useCallback(async (): Promise<Role> => {
+    const cred = await signInWithPopup(
+      getFirebaseAuth(),
+      new GoogleAuthProvider()
+    );
+    const role = await syncSessionCookie(cred.user);
+    if (!role) {
+      // New Google user with no role yet — sign them back out so they don't
+      // get stuck in a half state.
+      await signOut(getFirebaseAuth());
+      throw new Error(
+        "No account is set up for this Google user yet. Use email sign-up to pick a role."
+      );
+    }
+    return role;
   }, []);
 
   const signUp = useCallback(async (input: SignUpInput): Promise<Role> => {
@@ -123,10 +161,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       department: input.department,
       displayName: input.displayName.trim(),
     });
-    // Force a token refresh so the new custom claims land, which re-fires
-    // onIdTokenChanged -> session cookie is minted with role + department.
-    await cred.user.getIdToken(true);
-    return input.role;
+    // Force-refresh so the new claims land, then mint + await the session cookie.
+    const role = await syncSessionCookie(cred.user, true);
+    return role ?? input.role;
   }, []);
 
   const signOutUser = useCallback(async () => {

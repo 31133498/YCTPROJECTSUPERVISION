@@ -52,6 +52,7 @@ export default function SignUpPage() {
       });
       toast.success("Account created");
       router.replace(homePathForRole(assigned));
+      router.refresh();
     } catch (err) {
       const code = (err as { code?: string }).code;
       toast.error("Could not create account", {

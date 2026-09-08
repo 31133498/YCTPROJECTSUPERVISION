@@ -2,22 +2,22 @@ import { NextResponse, type NextRequest } from "next/server";
 
 /**
  * Edge gate for PAGE navigations: presence check only. The Admin SDK can't run
- * on the edge, so this does NOT verify the cookie or read claims — it just keeps
- * unauthenticated traffic off protected pages and signed-in users off /login.
+ * on the edge, so this does NOT verify the cookie or read claims.
  *
- * `/api/*` is deliberately NOT matched: route handlers authenticate themselves
- * with `getSessionUser()` and must return JSON 401/403, never an HTML redirect.
- * Full verification + role enforcement lives in each route group's server
- * layout via `requireRole()`, and again in Firestore rules / Supabase signing.
+ * `/api/*` is never matched — route handlers authenticate themselves and must
+ * return JSON 401/403. Full verification + role enforcement is in each route
+ * group's server layout via `requireRole()`, and in Firestore rules.
  */
 const SESSION_COOKIE = "__session";
-const PUBLIC_PATHS = ["/login", "/signup"];
+const AUTH_PAGES = ["/login", "/signup"];
+/** Reachable without a session. */
+const PUBLIC = ["/", "/login", "/signup"];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const hasSession = Boolean(req.cookies.get(SESSION_COOKIE)?.value);
-  const isPublic = PUBLIC_PATHS.some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`)
+  const isPublic = PUBLIC.some(
+    (p) => pathname === p || (p !== "/" && pathname.startsWith(`${p}/`))
   );
 
   if (!hasSession && !isPublic) {
@@ -27,7 +27,7 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (hasSession && isPublic) {
+  if (hasSession && AUTH_PAGES.includes(pathname)) {
     const url = req.nextUrl.clone();
     url.pathname = "/";
     url.search = "";
@@ -38,6 +38,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // Page routes only — never /api/*, Next internals, or static assets.
   matcher: ["/((?!api/|_next/static|_next/image|favicon.ico).*)"],
 };

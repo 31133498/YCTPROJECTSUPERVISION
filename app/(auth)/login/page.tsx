@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/lib/auth/auth-context";
+import { homePathForRole } from "@/lib/routes";
+import type { Role } from "@/lib/types";
 
 function mapAuthError(code?: string): string {
   switch (code) {
@@ -22,27 +24,33 @@ function mapAuthError(code?: string): string {
     case "auth/popup-closed-by-user":
       return "The Google sign-in window was closed.";
     default:
-      return "Please try again.";
+      return undefined as unknown as string;
   }
 }
 
 function LoginForm() {
   const { signInWithPassword, signInWithGoogle } = useAuth();
   const router = useRouter();
-  const next = useSearchParams().get("next") || "/";
+  const nextParam = useSearchParams().get("next");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState<null | "password" | "google">(null);
 
-  async function run(method: "password" | "google", fn: () => Promise<void>) {
+  async function run(method: "password" | "google", fn: () => Promise<Role>) {
     setPending(method);
     try {
-      await fn();
-      router.replace(next);
+      const role = await fn();
+      const dest =
+        nextParam && nextParam.startsWith("/") && !nextParam.startsWith("/login")
+          ? nextParam
+          : homePathForRole(role);
+      router.replace(dest);
+      router.refresh();
     } catch (err) {
+      const e = err as { code?: string; message?: string };
       toast.error("Sign-in failed", {
-        description: mapAuthError((err as { code?: string }).code),
+        description: mapAuthError(e.code) || e.message || "Please try again.",
       });
       setPending(null);
     }
@@ -50,7 +58,7 @@ function LoginForm() {
 
   return (
     <div className="animate-fade-in">
-      <h1 className="text-xl font-semibold tracking-tight">Sign in</h1>
+      <h1 className="text-xl font-black tracking-tight">Sign in</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         Continue to your supervision workspace.
       </p>
@@ -92,7 +100,7 @@ function LoginForm() {
 
       <div className="my-5 flex items-center gap-3">
         <Separator className="flex-1" />
-        <span className="text-2xs uppercase tracking-wider text-muted-foreground">
+        <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground">
           or
         </span>
         <Separator className="flex-1" />
@@ -111,7 +119,7 @@ function LoginForm() {
         No account?{" "}
         <Link
           href="/signup"
-          className="font-medium text-foreground underline-offset-4 hover:underline"
+          className="font-bold text-foreground underline underline-offset-4"
         >
           Create one
         </Link>

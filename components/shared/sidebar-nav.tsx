@@ -29,8 +29,8 @@ export function SidebarNav({
             className={cn(
               "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors",
               active
-                ? "bg-secondary font-medium text-foreground"
-                : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+                ? "border-2 border-border bg-foreground font-bold text-background"
+                : "border-2 border-transparent font-semibold text-muted-foreground hover:border-border hover:text-foreground"
             )}
           >
             <item.icon className="h-4 w-4 shrink-0" strokeWidth={2} />
