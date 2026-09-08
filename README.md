@@ -4,7 +4,7 @@ YABATECH ND project. Supervisors run final-year projects, students submit work a
 track milestones, the HOD sees the whole department.
 
 **Stack:** Next.js 14 (App Router) · TypeScript (strict) · Tailwind + shadcn/ui ·
-lucide-react · Firebase (Auth / Firestore / Storage) · Cloud Functions · Vercel.
+lucide-react · Firebase (Auth / Firestore) · Supabase (Storage) · Cloud Functions · Vercel.
 
 ---
 
@@ -34,7 +34,7 @@ Copy `.env.local.example` → `.env.local`. On **Vercel**, add every key under
 
 These ship in the browser bundle by design. They only *identify* the Firebase
 project; they are **not secrets**. Security is enforced by
-`firestore.rules` / `storage.rules` and by verified custom claims — never by
+`firestore.rules` and by verified custom claims — never by
 hiding these values.
 
 | Key | Notes |
@@ -55,6 +55,25 @@ hiding these values.
 Generate it at **Firebase console → Project settings → Service accounts →
 Generate new private key** and paste the file contents as a single-quoted value.
 
+### Supabase — file Storage
+
+The project is on the Firebase **Spark** plan, so Firebase Storage (Blaze-only)
+is not used. Submission files go to a **private** Supabase Storage bucket named
+`submissions`; downloads are short-lived signed URLs minted server-side after
+the caller is verified.
+
+| Key | Scope | Notes |
+| --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | public | `https://<ref>.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | public | guarded by Storage RLS, not by hiding |
+| `SUPABASE_SERVICE_ROLE_KEY` | **server-only, secret** | bypasses RLS; used only to sign download URLs / delete objects |
+
+Setup: Supabase dashboard → **Storage → New bucket** → name `submissions`,
+**Private**. Add RLS policies on `storage.objects` so a user can only touch
+paths under a project they belong to (path prefix
+`projects/<projectId>/submissions/...`). Client upload helper:
+`lib/storage/submissions.ts`; server signing: `lib/supabase-admin.ts`.
+
 ---
 
 ## Auth & roles
@@ -65,7 +84,7 @@ Generate new private key** and paste the file contents as a single-quoted value.
   `HttpOnly` session cookie. The browser never sets an auth cookie itself.
 - `middleware.ts` is a presence gate only (the Admin SDK can't run on the edge).
 - Real enforcement is `requireRole()` in each route group's server layout
-  (`lib/auth/session.ts`) **and** the Firestore/Storage rules.
+  (`lib/auth/session.ts`) **and** the Firestore rules + Supabase Storage RLS.
 - `role` and `department` are **custom claims**, provisioned by the Admin SDK.
   An account with no claims cannot obtain a session (see the 403 in the session
   route).
@@ -89,13 +108,16 @@ components/
                           app-shell, query-state, empty/error states, skeletons
 hooks/                    use-paginated-query, use-live-collection, use-async-data
 lib/
-  firebase.ts             client SDK (NEXT_PUBLIC_*)
+  firebase.ts             client SDK — Auth + Firestore (NEXT_PUBLIC_*)
   firebase-admin.ts       admin SDK (server-only)
+  supabase.ts             client — Storage uploads
+  supabase-admin.ts       server — signed URLs / object delete
+  storage/submissions.ts  submission upload helper
   auth/                   session (server) + auth-context (client)
   firestore/              typed query layer — one function per query
   types.ts                domain model
 functions/                Cloud Functions (own package.json)
-firestore.rules  storage.rules  firestore.indexes.json  firebase.json
+firestore.rules  firestore.indexes.json  firebase.json
 ```
 
 Route-group folders (`(student)` …) carry the auth + shell layout; the inner
@@ -157,7 +179,7 @@ button, `<EmptyState>` with real copy. Write actions fire a `sonner` toast.
 ### Firebase (rules / indexes / functions)
 
 ```bash
-firebase deploy --only firestore:rules,firestore:indexes,storage
+firebase deploy --only firestore:rules,firestore:indexes
 cd functions && npm install && npm run deploy   # Cloud Functions
 ```
 

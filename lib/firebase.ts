@@ -1,17 +1,17 @@
 /**
  * Client-side Firebase SDK — lazily initialised.
  *
- * Every value is read from `NEXT_PUBLIC_*` env vars (safe to expose in the
- * browser bundle — see README). Nothing is hardcoded.
+ * Used for Auth + Firestore only. File storage is handled by Supabase Storage
+ * (see `lib/supabase.ts`) — the project is on the Spark plan, no Firebase
+ * Storage.
  *
- * Init is deferred to first use so importing this module during SSR /
- * `next build` prerender (where the vars legitimately aren't present) doesn't
- * throw. Call `getDb()` / `getFirebaseAuth()` / `getFirebaseStorage()`.
+ * Every value is read from `NEXT_PUBLIC_*` env vars (safe to expose in the
+ * browser bundle — see README). Nothing is hardcoded. Init is deferred to first
+ * use so importing this during SSR / `next build` prerender doesn't throw.
  */
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
-import { getStorage, type FirebaseStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -23,14 +23,19 @@ const firebaseConfig = {
 };
 
 function assertConfig(): void {
-  const missing = Object.entries(firebaseConfig)
-    .filter(([, v]) => !v)
-    .map(([k]) => k);
+  const required = [
+    "apiKey",
+    "authDomain",
+    "projectId",
+    "messagingSenderId",
+    "appId",
+  ] as const;
+  const missing = required.filter((k) => !firebaseConfig[k]);
   if (missing.length > 0) {
     throw new Error(
-      `Firebase client config incomplete. Missing: ${missing.join(
-        ", "
-      )}. Copy .env.local.example to .env.local (or set the NEXT_PUBLIC_FIREBASE_* vars in Vercel).`
+      `Firebase client config incomplete. Missing: ${missing
+        .map((k) => `NEXT_PUBLIC_FIREBASE_${k.toUpperCase()}`)
+        .join(", ")}. Set them in .env.local / Vercel.`
     );
   }
 }
@@ -38,7 +43,6 @@ function assertConfig(): void {
 let cachedApp: FirebaseApp | undefined;
 let cachedAuth: Auth | undefined;
 let cachedDb: Firestore | undefined;
-let cachedStorage: FirebaseStorage | undefined;
 
 export function getFirebaseApp(): FirebaseApp {
   if (cachedApp) return cachedApp;
@@ -56,8 +60,4 @@ export function getFirebaseAuth(): Auth {
 
 export function getDb(): Firestore {
   return (cachedDb ??= getFirestore(getFirebaseApp()));
-}
-
-export function getFirebaseStorage(): FirebaseStorage {
-  return (cachedStorage ??= getStorage(getFirebaseApp()));
 }

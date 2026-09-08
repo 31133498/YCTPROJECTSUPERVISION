@@ -34,7 +34,13 @@ export const paths = {
     `projects/${projectId}/submissions/${submissionId}/comments/${commentId}`,
 } as const;
 
-/** Storage object paths — mirrors the Firestore project subtree. */
+/**
+ * Supabase Storage object paths — mirrors the Firestore project subtree.
+ * Bucket: `SUBMISSIONS_BUCKET`. `SubmissionDoc.storagePath` holds the value of
+ * `submissionFile(...)`; resolve it to a signed URL server-side.
+ */
+export const SUBMISSIONS_BUCKET = "submissions";
+
 export const storagePaths = {
   submissionFile: (
     projectId: string,

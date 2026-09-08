@@ -1,16 +1,15 @@
 import "server-only";
 
 /**
- * Server-side Firebase Admin SDK — lazily initialised.
+ * Server-side Firebase Admin SDK — lazily initialised. Auth + Firestore only
+ * (file storage is Supabase — see `lib/supabase.ts`).
  *
  * Reads `FIREBASE_SERVICE_ACCOUNT_KEY` — a full service-account JSON string,
  * server-only, NEVER prefixed `NEXT_PUBLIC_`. Set it in Vercel's server env for
- * both Preview and Production. See README ("server-only Firebase keys").
+ * both Preview and Production.
  *
  * Init is deferred to first use (not module load) so that `next build`'s
- * page-data collection doesn't crash on machines/CI without the key. Route
- * handlers and server components call `getAdminAuth()` / `getAdminDb()` /
- * `getAdminStorage()`.
+ * page-data collection doesn't crash on machines/CI without the key.
  */
 import {
   getApps,
@@ -21,7 +20,6 @@ import {
 } from "firebase-admin/app";
 import { getAuth, type Auth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
-import { getStorage, type Storage } from "firebase-admin/storage";
 
 function loadServiceAccount(): ServiceAccount {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
@@ -58,10 +56,7 @@ function getAdminApp(): App {
   cachedApp =
     getApps().length > 0
       ? getApps()[0]
-      : initializeApp({
-          credential: cert(loadServiceAccount()),
-          storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-        });
+      : initializeApp({ credential: cert(loadServiceAccount()) });
   return cachedApp;
 }
 
@@ -71,8 +66,4 @@ export function getAdminAuth(): Auth {
 
 export function getAdminDb(): Firestore {
   return getFirestore(getAdminApp());
-}
-
-export function getAdminStorage(): Storage {
-  return getStorage(getAdminApp());
 }
